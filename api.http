@@ -5,6 +5,7 @@ GET http://localhost:3000
 GET http://localhost:3000/partners
 
 ###
+# @name createPartner
 POST http://localhost:3000/partners
 Content-Type: application/json
 
@@ -13,12 +14,13 @@ Content-Type: application/json
 }
 
 ###
-@partner_id = 076a2ae5-b4ed-438d-89fc-e1a4b42372ba
+@partner_id = {{createPartner.response.body.$.id}}
 
 ###
 GET http://localhost:3000/customers
 
 ###
+# @name createCustomer
 POST http://localhost:3000/customers
 Content-Type: application/json
 
@@ -28,12 +30,27 @@ Content-Type: application/json
 }
 
 ###
-@customer_id = 61f0ff6e-0bb1-4635-8899-4b88ce46975b
+@customer_id = {{createCustomer.response.body.$.id}}
+
+###
+# Cliente B: entra na lista de espera quando a seção esgota
+# @name createCustomerB
+POST http://localhost:3000/customers
+Content-Type: application/json
+
+{
+    "name": "Customer 2",
+    "cpf": "703.758.870-91"
+}
+
+###
+@customer_b_id = {{createCustomerB.response.body.$.id}}
 
 ###
 GET http://localhost:3000/events
 
 ###
+# @name createEvent
 POST http://localhost:3000/events
 Content-Type: application/json
 
@@ -45,12 +62,13 @@ Content-Type: application/json
 }
 
 ###
-@event_id = 3181cb03-59e6-469a-9942-358b07882a72
+@event_id = {{createEvent.response.body.$.id}}
 
 ###
 GET http://localhost:3000/events/{{event_id}}/sections
 
 ###
+# @name createSection
 POST http://localhost:3000/events/{{event_id}}/sections
 Content-Type: application/json
 
@@ -65,7 +83,7 @@ Content-Type: application/json
 PUT http://localhost:3000/events/{{event_id}}/publish-all
 
 ###
-@section_id = 42a5f5b1-30c5-4b2f-b9b8-84e5cc948542
+@section_id = {{createSection.response.body.$.sections[0].id}}
 
 ###
 PUT http://localhost:3000/events/{{event_id}}/sections/{{section_id}}
@@ -77,10 +95,14 @@ Content-Type: application/json
 }
 
 ###
+# @name listSpots
 GET http://localhost:3000/events/{{event_id}}/sections/{{section_id}}/spots
 
 ###
-PUT http://localhost:3000/events/{{event_id}}/sections/{{section_id}}/spots/2179f4e2-b3bc-4be9-b55d-f0876f24987d
+@spot_id = {{listSpots.response.body.$[0].id}}
+
+###
+PUT http://localhost:3000/events/{{event_id}}/sections/{{section_id}}/spots/{{spot_id}}
 Content-Type: application/json
 
 {
@@ -91,12 +113,42 @@ Content-Type: application/json
 GET http://localhost:3000/events/{{event_id}}/orders
 
 ###
+# Cliente A compra o único lugar da seção (a seção esgota)
+# @name createOrder
 POST http://localhost:3000/events/{{event_id}}/orders
 Content-Type: application/json
 
 {
     "customer_id": "{{customer_id}}",
     "section_id": "{{section_id}}",
-    "spot_id": "96298e63-5a38-4352-b97d-322259f10921",
+    "spot_id": "{{spot_id}}",
     "card_token": "tok_visa"
 }
+
+###
+@order_id = {{createOrder.response.body.$.id}}
+
+###
+# Lista de espera: cliente B entra na fila da seção esgotada (entrada PENDING)
+POST http://localhost:3000/events/{{event_id}}/sections/{{section_id}}/waiting-list
+Content-Type: application/json
+
+{
+    "customer_id": "{{customer_b_id}}"
+}
+
+###
+# Lista de espera: entradas na ordem de chegada, com seus status
+GET http://localhost:3000/events/{{event_id}}/sections/{{section_id}}/waiting-list
+
+###
+# Cancelamento: OrderCancelled -> EventSpotReleased -> SpotOfferedToWaitingCustomer
+POST http://localhost:3000/events/{{event_id}}/orders/{{order_id}}/cancel
+
+###
+# Consequência 1: o lugar voltou a ficar disponível ("reserved": false)
+GET http://localhost:3000/events/{{event_id}}/sections/{{section_id}}/spots
+
+###
+# Consequência 2: a entrada do cliente B está NOTIFIED
+GET http://localhost:3000/events/{{event_id}}/sections/{{section_id}}/waiting-list
